@@ -1,81 +1,121 @@
-name: "🪄 Imad Khan — Windows 11 (16GB RAM) Precision"
+name: "🪄 Imad Khan — 10x Multi-Worker RDP"
 
 on:
   workflow_dispatch:
     inputs:
-      CODE:
-        description: "Google Remote Desktop Code"
-        required: true
-      PIN:
-        description: "CRD PIN (6+ digits)"
+      CODE1:
+        description: "RDP Code 1"
         required: false
+      CODE2:
+        description: "RDP Code 2"
+        required: false
+      CODE3:
+        description: "RDP Code 3"
+        required: false
+      CODE4:
+        description: "RDP Code 4"
+        required: false
+      CODE5:
+        description: "RDP Code 5"
+        required: false
+      CODE6:
+        description: "RDP Code 6"
+        required: false
+      CODE7:
+        description: "RDP Code 7"
+        required: false
+      CODE8:
+        description: "RDP Code 8"
+        required: false
+      CODE9:
+        description: "RDP Code 9"
+        required: false
+      CODE10:
+        description: "RDP Code 10"
+        required: false
+      SHARED_PIN:
+        description: "Shared PIN for all active Workers"
+        required: true
         default: "123456"
 
 jobs:
-  automation:
-    runs-on: windows-11-arm # 16GB RAM physical
-    timeout-minutes: 340    # Total Mission Time (5h 40m)
-    name: "🚀 Imad Khan 16GB Workstation"
+  worker-rdp:
+    name: "🚀 Worker-${{ matrix.id }}"
+    runs-on: windows-2022
+    timeout-minutes: 340
+    strategy:
+      matrix:
+        id: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+      fail-fast: false
 
     env:
-      RAW_CODE: ${{ github.event.inputs.CODE }}
-      PIN_INPUT: ${{ github.event.inputs.PIN }}
-      PROTON_URL: "https://protonvpn.com/download/ProtonVPN_v4.3.11_x64.exe"
-
-    defaults:
-      run:
-        shell: pwsh
+      MY_CODE: ${{ github.event.inputs[format('CODE{0}', matrix.id)] }}
+      MY_PIN: ${{ github.event.inputs.SHARED_PIN }}
+      ZIP_URL: "https://dhruvmirrorpremiumfiletolink-5f2f6b64412a.herokuapp.com/1108367/Auto+Imad.zip?hash=AgADqR"
 
     steps:
-      - name: "🐍 Step 1: Install Python 3.14.2 (Arm64 Native)"
+      - name: "🔍 Check for Code"
+        id: check_code
+        run: |
+          if (-not $env:MY_CODE) {
+            Write-Host "⚠️ No code for Worker-${{ matrix.id }}. Skipping..."
+            echo "skip=true" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "skip=false" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: "🐍 Step 1: Python 3.14.2"
+        if: steps.check_code.outputs.skip == 'false'
         uses: actions/setup-python@v5
         with:
           python-version: '3.14.2'
-          architecture: 'arm64'
 
-      - name: "📦 Step 2: Provision Imad Khan Suite"
+      - name: "📂 Step 2: Extract NCSOFT to Desktop"
+        if: steps.check_code.outputs.skip == 'false'
         run: |
-          # Now that Python is in the PATH, we just call it normally
-          python -m pip install --upgrade pip
-          pip install requests playwright httpx[http2]
-          playwright install chromium
-          Write-Host "✅ Python 3.14.2 Environment Ready."
-
-      - name: "🛡️ Step 3: Proton VPN Deployment"
-        run: |
-          $vpnPath = Join-Path $env:TEMP "ProtonVPN_Setup.exe"
-          Invoke-WebRequest -Uri $env:PROTON_URL -OutFile $vpnPath -UseBasicParsing
-          Start-Process -FilePath $vpnPath -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
-          Write-Host "✅ VPN Ready."
-
-      - name: "🌐 Step 4: Google Remote Desktop Setup"
-        run: |
-          $crdMsi = Join-Path $env:TEMP "crdhost.msi"
-          Invoke-WebRequest -Uri "https://dl.google.com/edgedl/chrome-remote-desktop/chromeremotedesktophost.msi" -OutFile $crdMsi -UseBasicParsing
-          Start-Process msiexec.exe -ArgumentList "/i", $crdMsi, "/qn", "/norestart" -Wait
+          # Dynamically locate the Desktop folder
+          $DesktopPath = Join-Path $env:USERPROFILE "Desktop"
+          $ncPath = Join-Path $DesktopPath "NCSOFT"
           
-          # Extraction logic for code
-          $authCode = if ($env:RAW_CODE -match '--code="([^"]+)"') { $matches[1] } else { $env:RAW_CODE }
+          # Create the folder on Desktop
+          if (-not (Test-Path $ncPath)) { New-Item -ItemType Directory -Path $ncPath -Force }
+          
+          Write-Host "⬇️ Downloading Auto Imad Zip..."
+          Invoke-WebRequest -Uri $env:ZIP_URL -OutFile "C:\data.zip" -UseBasicParsing
+          
+          Write-Host "📦 Extracting to Desktop: $ncPath"
+          Expand-Archive -Path "C:\data.zip" -DestinationPath $ncPath -Force
+          Remove-Item "C:\data.zip"
+          Write-Host "✅ NCSOFT is now on the Desktop."
+
+      - name: "🛡️ Step 3: Proton VPN (Silent)"
+        if: steps.check_code.outputs.skip == 'false'
+        run: |
+          $vpnUrl = "https://protonvpn.com/download/ProtonVPN_v4.3.11_x64.exe"
+          Invoke-WebRequest -Uri $vpnUrl -OutFile "vpn_setup.exe" -UseBasicParsing
+          Start-Process -FilePath "vpn_setup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
+
+      - name: "🌐 Step 4: Launch Remote Desktop"
+        if: steps.check_code.outputs.skip == 'false'
+        run: |
+          Invoke-WebRequest -Uri "https://dl.google.com/edgedl/chrome-remote-desktop/chromeremotedesktophost.msi" -OutFile "crd.msi" -UseBasicParsing
+          Start-Process msiexec.exe -ArgumentList "/i", "crd.msi", "/qn", "/norestart" -Wait
+          
+          $authCode = if ($env:MY_CODE -match '--code="([^"]+)"') { $matches[1] } else { $env:MY_CODE }
           $hostStarter = "C:\Program Files (x86)\Google\Chrome Remote Desktop\CurrentVersion\remoting_start_host.exe"
           
-          & $hostStarter --code="$authCode" --redirect-url="https://remotedesktop.google.com/_/oauthredirect" --name=$env:COMPUTERNAME --pin=$env:PIN_INPUT
-          Write-Host "✅ GCRD Host Started Successfully."
+          & $hostStarter --code="$authCode" --redirect-url="https://remotedesktop.google.com/_/oauthredirect" --name="Worker-${{ matrix.id }}" --pin=$env:MY_PIN
 
-      - name: "⏳ Step 5: Mission Control Loop (340 Minutes)"
+      - name: "⏳ Step 5: Mission Control (340 Mins)"
+        if: steps.check_code.outputs.skip == 'false'
         run: |
           Write-Host "==============================================="
-          Write-Host "👤 OWNER: Imad Khan"
-          Write-Host "🕒 MISSION START: $(Get-Date)"
-          Write-Host "🚀 STATUS: 16GB RAM ACTIVE"
+          Write-Host "👤 OWNER       : Imad Khan"
+          Write-Host "🆔 WORKER ID   : ${{ matrix.id }} ACTIVE"
+          Write-Host "📂 LOCATION    : Desktop\NCSOFT"
           Write-Host "==============================================="
-          
           for ($i=1; $i -le 340; $i++) {
-              if ($i -eq 330) { Write-Host "✋ RELAY TRIGGER: 10 mins to shutdown." }
-              if ($i -eq 335) { 
-                  Write-Host "⏹️ SHUTDOWN COMMAND: Closing session."
-                  shutdown /s /f /t 0
-              }
-              $rem = 340 - $i
-              Write-Host "Minute: $i/340 ($rem remaining)"
+              if ($i -eq 330) { Write-Host "✋ RELAY TRIGGER: 10 mins warning." }
+              if ($i -eq 335) { shutdown /s /f /t 0 }
               Start-Sleep -Seconds 60
           }
