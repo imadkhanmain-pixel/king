@@ -1,4 +1,4 @@
-name: "🪄 Imad Khan — Windows 11 RDP"
+name: "🪄 Imad Khan — Windows 11 (16GB RAM) Precision"
 
 on:
   workflow_dispatch:
@@ -13,13 +13,14 @@ on:
 
 jobs:
   automation:
-    runs-on: windows-2025
-    name: "🚀 Imad Khan Win11 Workstation"
+    runs-on: windows-11-arm # Guaranteed 16GB RAM
+    timeout-minutes: 340    # Total Mission Time limit
+    name: "🚀 Imad Khan 16GB Workstation"
 
     env:
       RAW_CODE: ${{ github.event.inputs.CODE }}
       PIN_INPUT: ${{ github.event.inputs.PIN }}
-      PY_EXE: "C:\\hostedtoolcache\\windows\\Python\\3.14.2\\x64\\python.exe"
+      PY_EXE: "C:\\hostedtoolcache\\windows\\Python\\3.14.2\\arm64\\python.exe"
       PROTON_URL: "https://protonvpn.com/download/ProtonVPN_v4.3.11_x64.exe"
 
     defaults:
@@ -27,54 +28,60 @@ jobs:
         shell: pwsh
 
     steps:
-      - name: "🐍 Step 1: Initialize Python 3.14.2"
+      - name: "🐍 Step 1: Force Python 3.14.2 (Arm64)"
         run: |
           if (Test-Path $env:PY_EXE) {
               $pyDir = Split-Path $env:PY_EXE
               echo "$pyDir" >> $env:GITHUB_PATH
               echo "$pyDir\Scripts" >> $env:GITHUB_PATH
-              Write-Host "✅ Python 3.14.2 localized."
+              [Environment]::SetEnvironmentVariable("Path", "$pyDir;$pyDir\Scripts;" + [Environment]::GetEnvironmentVariable("Path", "User"), "User")
+              Write-Host "✅ Python 3.14.2 Arm64 Set."
           }
 
-      - name: "📦 Step 2: Imad Khan Toolsuite"
+      - name: "📦 Step 2: Provision Imad Khan Suite"
         run: |
           & $env:PY_EXE -m pip install --upgrade pip
           & $env:PY_EXE -m pip install requests playwright httpx[http2]
           & $env:PY_EXE -m playwright install chromium
-          Write-Host "✅ Python environment and Playwright ready."
 
       - name: "🛡️ Step 3: Proton VPN Deployment"
         run: |
           $vpnPath = Join-Path $env:TEMP "ProtonVPN_Setup.exe"
           Invoke-WebRequest -Uri $env:PROTON_URL -OutFile $vpnPath -UseBasicParsing
           Start-Process -FilePath $vpnPath -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
-          Write-Host "✅ Proton VPN installed."
+          Write-Host "✅ VPN Ready."
 
       - name: "🌐 Step 4: Google Remote Desktop Setup"
         run: |
-          # Download and Install CRD
           $crdMsi = Join-Path $env:TEMP "crdhost.msi"
           Invoke-WebRequest -Uri "https://dl.google.com/edgedl/chrome-remote-desktop/chromeremotedesktophost.msi" -OutFile $crdMsi -UseBasicParsing
           Start-Process msiexec.exe -ArgumentList "/i", $crdMsi, "/qn", "/norestart" -Wait
           
-          # Extraction logic: works if you paste just the code OR the whole command
           $authCode = if ($env:RAW_CODE -match '--code="([^"]+)"') { $matches[1] } else { $env:RAW_CODE }
-          
           $hostStarter = "C:\Program Files (x86)\Google\Chrome Remote Desktop\CurrentVersion\remoting_start_host.exe"
-          
-          Write-Host "🚀 Launching Remote Desktop..."
           & $hostStarter --code="$authCode" --redirect-url="https://remotedesktop.google.com/_/oauthredirect" --name=$env:COMPUTERNAME --pin=$env:PIN_INPUT
-          Write-Host "✅ Connection established."
 
-      - name: "⏳ Step 5: Session Keep-Alive (5h 50m)"
+      - name: "⏳ Step 5: Mission Control Loop (340 Minutes)"
         run: |
           Write-Host "==============================================="
           Write-Host "👤 OWNER: Imad Khan"
-          Write-Host "🖥️ OS: Windows 11"
-          Write-Host "⏱️ DURATION: 350 Minutes"
+          Write-Host "🕒 MISSION START: $(Get-Date)"
           Write-Host "==============================================="
-          for ($i=1; $i -le 350; $i++) {
-              $rem = 350 - $i
-              Write-Host "Session Active. $rem minutes remaining..."
+          
+          for ($i=1; $i -le 340; $i++) {
+              # RELAY TRIGGER @ 330 MINUTES
+              if ($i -eq 330) {
+                  Write-Host "✋ RELAY TRIGGER: 330 minutes reached. Final 10-minute warning."
+              }
+
+              # SHUTDOWN COMMAND @ 335 MINUTES
+              if ($i -eq 335) {
+                  Write-Host "⏹️ SHUTDOWN COMMAND: 335 minutes reached. Powering off."
+                  # Forceful shutdown to close all apps and RDP session
+                  shutdown /s /f /t 0
+              }
+
+              $rem = 340 - $i
+              Write-Host "Mission Active... Minute: $i/340 ($rem remaining)"
               Start-Sleep -Seconds 60
           }
