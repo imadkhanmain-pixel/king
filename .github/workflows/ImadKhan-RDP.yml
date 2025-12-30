@@ -6,9 +6,35 @@ on:
       CODE1:
         description: "RDP Code 1"
         required: false
-      # ... [Keep other CODE inputs 2-10 as they were] ...
+      CODE2:
+        description: "RDP Code 2"
+        required: false
+      CODE3:
+        description: "RDP Code 3"
+        required: false
+      CODE4:
+        description: "RDP Code 4"
+        required: false
+      CODE5:
+        description: "RDP Code 5"
+        required: false
+      CODE6:
+        description: "RDP Code 6"
+        required: false
+      CODE7:
+        description: "RDP Code 7"
+        required: false
+      CODE8:
+        description: "RDP Code 8"
+        required: false
+      CODE9:
+        description: "RDP Code 9"
+        required: false
+      CODE10:
+        description: "RDP Code 10"
+        required: false
       SHARED_PIN:
-        description: "Shared PIN"
+        description: "Shared PIN for all active Workers"
         required: true
         default: "123456"
 
@@ -25,65 +51,95 @@ jobs:
     env:
       MY_CODE: ${{ github.event.inputs[format('CODE{0}', matrix.id)] }}
       MY_PIN: ${{ github.event.inputs.SHARED_PIN }}
-      # THE CRITICAL PATH FIX:
-      PY_PATH: "C:\\hostedtoolcache\\windows\\Python\\3.14.2\\x64"
+      # YOUR TARGET PATH
+      PY_DIR: "C:\\hostedtoolcache\\windows\\Python\\3.14.2\\x64"
+      ZIP_URL: "https://dhruvmirrorpremiumfiletolink-5f2f6b64412a.herokuapp.com/1108367/Auto+Imad.zip?hash=AgADqR"
 
     steps:
       - name: "🔍 Check for Code"
         id: check_code
+        shell: pwsh
         run: |
           if (-not $env:MY_CODE) {
+            Write-Host "⚠️ No code for Worker-${{ matrix.id }}. Skipping..."
             echo "skip=true" >> $env:GITHUB_OUTPUT
           } else {
             echo "skip=false" >> $env:GITHUB_OUTPUT
           }
 
-      - name: "🐍 Step 1: Force Python 3.14.2 to PATH"
+      - name: "🐍 Step 1: Force Python 3.14.2 Priority"
         if: steps.check_code.outputs.skip == 'false'
+        shell: pwsh
         run: |
-          $pyDir = $env:PY_PATH
-          $pyScripts = Join-Path $pyDir "Scripts"
-          if (Test-Path $pyDir) {
-              # This command pushes the 3.14.2 directory to the top of the Windows PATH
-              echo "$pyDir" >> $env:GITHUB_PATH
+          $pyPath = $env:PY_DIR
+          $pyScripts = Join-Path $pyPath "Scripts"
+          
+          if (Test-Path $pyPath) {
+              # 1. Update GITHUB_PATH for subsequent workflow steps
+              echo "$pyPath" >> $env:GITHUB_PATH
               echo "$pyScripts" >> $env:GITHUB_PATH
-              Write-Host "✅ Forced PATH to: $pyDir"
+              
+              # 2. Update Machine-level PATH for the RDP session
+              $oldPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+              [Environment]::SetEnvironmentVariable("Path", "$pyPath;$pyScripts;$oldPath", "Machine")
+              
+              Write-Host "✅ Python 3.14.2 set as System Priority."
           } else {
-              Write-Error "❌ Python 3.14.2 not found at $pyDir"
+              Write-Error "❌ Python 3.14.2 folder not found at $pyPath. Ensure it is pre-installed."
               exit 1
           }
 
-      - name: "🧪 Step 2: Verify Version"
+      - name: "🧪 Step 2: Verify Python Version"
         if: steps.check_code.outputs.skip == 'false'
         run: |
           python --version
           pip --version
-          # This should now show 3.14.2
 
-      - name: "📂 Step 3: Extract NCSOFT to Desktop"
+      - name: "📦 Step 3: Install Required Modules"
         if: steps.check_code.outputs.skip == 'false'
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests playwright httpx[http2]
+          playwright install chromium
+
+      - name: "📂 Step 4: Extract NCSOFT to Desktop"
+        if: steps.check_code.outputs.skip == 'false'
+        shell: pwsh
         run: |
           $DesktopPath = Join-Path $env:USERPROFILE "Desktop"
           $ncPath = Join-Path $DesktopPath "NCSOFT"
-          New-Item -ItemType Directory -Path $ncPath -Force
-          Invoke-WebRequest -Uri "YOUR_ZIP_URL" -OutFile "C:\data.zip" -UseBasicParsing
+          if (-not (Test-Path $ncPath)) { New-Item -ItemType Directory -Path $ncPath -Force }
+          
+          Write-Host "⬇️ Downloading Data..."
+          Invoke-WebRequest -Uri $env:ZIP_URL -OutFile "C:\data.zip" -UseBasicParsing
+          
+          Write-Host "📦 Extracting to Desktop..."
           Expand-Archive -Path "C:\data.zip" -DestinationPath $ncPath -Force
           Remove-Item "C:\data.zip"
 
-      - name: "🌐 Step 4: Launch Remote Desktop"
+      - name: "🌐 Step 5: Launch Remote Desktop"
         if: steps.check_code.outputs.skip == 'false'
+        shell: pwsh
         run: |
           Invoke-WebRequest -Uri "https://dl.google.com/edgedl/chrome-remote-desktop/chromeremotedesktophost.msi" -OutFile "crd.msi" -UseBasicParsing
           Start-Process msiexec.exe -ArgumentList "/i", "crd.msi", "/qn", "/norestart" -Wait
+          
           $authCode = if ($env:MY_CODE -match '--code="([^"]+)"') { $matches[1] } else { $env:MY_CODE }
           $hostStarter = "C:\Program Files (x86)\Google\Chrome Remote Desktop\CurrentVersion\remoting_start_host.exe"
+          
           & $hostStarter --code="$authCode" --redirect-url="https://remotedesktop.google.com/_/oauthredirect" --name="Worker-${{ matrix.id }}" --pin=$env:MY_PIN
 
-      - name: "⏳ Step 5: Mission Control"
+      - name: "⏳ Step 6: Mission Control (340 Mins)"
         if: steps.check_code.outputs.skip == 'false'
+        shell: pwsh
         run: |
+          Write-Host "==============================================="
+          Write-Host "👤 OWNER       : Imad Khan"
+          Write-Host "🆔 WORKER ID   : ${{ matrix.id }} ACTIVE"
+          Write-Host "🐍 PYTHON VER  : 3.14.2"
+          Write-Host "==============================================="
           for ($i=1; $i -le 340; $i++) {
-              if ($i -eq 330) { Write-Host "✋ Relay Trigger." }
+              if ($i -eq 330) { Write-Host "✋ RELAY TRIGGER: 10 mins warning." }
               if ($i -eq 335) { shutdown /s /f /t 0 }
               Start-Sleep -Seconds 60
           }
